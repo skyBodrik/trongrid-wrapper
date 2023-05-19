@@ -10,7 +10,7 @@
         "ionux/phactor": "1.0.8",
         "kornrunner/keccak": "~1.0"
     },
-    "license": "Apache 2.0",
+    "license": "Apache-2.0",
     "autoload": {
         "psr-4": {
             "Skybodrik\\TrongridWrapper\\": "src/"
