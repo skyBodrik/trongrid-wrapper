@@ -1,0 +1,29 @@
+{
+    "name": "skybodrik/trongrid-wrapper",
+    "description": "Throngrid API wrapper for easy use in PHP",
+    "type": "library",
+    "require": {
+        "guzzlehttp/guzzle": "7.6.x-dev",
+        "ext-json": "*",
+        "fenguoz/web3.php": "^1.0",
+        "fenguoz/tron-api": "~1.1",
+        "ionux/phactor": "1.0.8",
+        "kornrunner/keccak": "~1.0"
+    },
+    "license": "Apache 2.0",
+    "autoload": {
+        "psr-4": {
+            "Skybodrik\\TrongridWrapper\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Igor Brodt",
+            "email": "bodrik.sky@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require-dev": {
+        "phpunit/phpunit": "^10.2@dev"
+    }
+}
