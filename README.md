@@ -2,7 +2,6 @@ Russian
 
 <h1 align="center">trongrid-wrapper</h1>
 
-## Введение
 
 Реализует базовую функицональность для работы с сетью TRON. Поддерживает TRX и USDT. С помощью конфигурационного файла можно расширить список поддерживаемых токенов. 
 
@@ -12,7 +11,7 @@ Russian
 - Проверить адрес `validateAddress(Address $address)`
 - Получить модель Address `buildAddress(string $address, string $privateKey)`
 - Проверить баланс `getBalance(string $address, string $token)`
-- Transaction transfer (offline signature) `makeTransaction(Address $fromAddress, string $toAddress, string $token, string $amount)`
+- Совершить транзакцию `makeTransaction(Address $fromAddress, string $toAddress, string $token, string $amount)`
 
 ## Быстрый старт
 
