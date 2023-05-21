@@ -274,7 +274,7 @@ class TrongridWrapper
         // IF token is not TRX, go next
         $tokenConfig = $configTokenList[$token];
 
-        if (strtoupper($tokenConfig['network']) === 'TRC20') { // Обрабатываем TRC20 контракты
+        if (isset($tokenConfig['network']) && strtoupper($tokenConfig['network']) === 'TRC20') { // Обрабатываем TRC20 контракты
             $hexAddress = $tronInstance->address2HexString($address);
 
             $contractAddress = $tokenConfig['contract'];
