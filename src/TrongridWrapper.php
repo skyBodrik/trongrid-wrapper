@@ -5,6 +5,7 @@ namespace Skybodrik\TrongridWrapper;
 use GuzzleHttp\Client as GuzzleClient;
 use IEXBase\TronAPI\Exception\TronException;
 use IEXBase\TronAPI\Provider\HttpProvider;
+use IEXBase\TronAPI\Support\Base58;
 use IEXBase\TronAPI\Tron;
 use InvalidArgumentException;
 use Skybodrik\TrongridWrapper\Config\MainnetConfig;
@@ -111,6 +112,156 @@ class TrongridWrapper
     }
 
     /**
+     * Получить историю транзакций
+     *
+     * @param Address|string $address
+     * @param bool $onlyConfirmed если true, то вернёт только подтверждённые транзакции
+     * @return void
+     * @throws TrongridWrapperException
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function getTrc20TransactionHistory(Address|string $address, bool $onlyConfirmed = true)
+    {
+        $qParams = [];
+        if ($onlyConfirmed) {
+            $qParams['only_confirmed'] = 'true';
+        }
+
+        $response = $this->httpClient->request('GET', $this->buildApiUrl('v1/accounts', [$address, 'transactions/trc20'], $qParams), [
+            'headers' => [
+                'accept' => 'application/json',
+                'content-type' => 'application/json',
+                'TRON-PRO-API-KEY' => $this->config->getApiKey(),
+            ],
+        ]);
+
+        if ($statusCode = $response->getStatusCode() !== 200) {
+            throw new TrongridWrapperException('The response has a code. ' . $statusCode .  ' Expected 200. ');
+        }
+
+        $content = json_decode($response->getBody()->getContents(), true);
+
+        if (isset($content['result']['code'])) {
+            throw new TrongridWrapperException(hex2bin($content['result']['message']));
+        }
+
+        return $content['data'];
+    }
+
+    /**
+     * Получить события по TransactionID
+     *
+     * @param string $txn
+     * @return mixed
+     * @throws TrongridWrapperException
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function getTransactionEvents(string $txn)
+    {
+        $response = $this->httpClient->request('GET', $this->buildApiUrl('v1/transactions', [$txn, 'events']), [
+            'headers' => [
+                'accept' => 'application/json',
+                'content-type' => 'application/json',
+                'TRON-PRO-API-KEY' => $this->config->getApiKey(),
+            ],
+        ]);
+
+        if ($statusCode = $response->getStatusCode() !== 200) {
+            throw new TrongridWrapperException('The response has a code. ' . $statusCode .  ' Expected 200. ');
+        }
+
+        $content = json_decode($response->getBody()->getContents(), true);
+
+        if (isset($content['result']['code'])) {
+            throw new TrongridWrapperException(hex2bin($content['result']['message']));
+        }
+
+        return $content['data'];
+    }
+
+    /**
+     * Получить ожидаемую затрату энергии
+     *
+     * @param Address $fromAddress
+     * @param string $toAddress
+     * @param string $token
+     * @param string $amount
+     * @return mixed
+     * @throws TronException
+     * @throws TrongridWrapperException
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function getEstimateFee(Address $fromAddress, string $toAddress, string $token, string $amount)
+    {
+
+        $configTokenList = $this->config->getTokenList();
+
+        if (!isset($configTokenList[$token])) {
+            throw new TrongridWrapperException('Unknown token ' . $token);
+        }
+
+        $host = $this->config->getNetworkUrl();
+        $fullNode = new HttpProvider($host);
+        $solidityNode = new HttpProvider($host);
+        $eventServer = new HttpProvider($host);
+        try {
+            $tronInstance = new Tron($fullNode, $solidityNode, $eventServer);
+            $tronInstance->setAddress($fromAddress->getAddress());
+            $tronInstance->setPrivateKey($fromAddress->getPrivateKey());
+
+            // IF token is not TRX, go next
+            $tokenConfig = $configTokenList[$token];
+
+            if (strtoupper($tokenConfig['network']) === 'TRC20') { // Обрабатываем TRC20 контракты
+
+                $toHexAddress = $tronInstance->address2HexString($toAddress);
+                $toFormat = Formatter::toAddressFormat($toHexAddress);
+                try {
+                    $amount = Utils::toMinUnitByDecimals($amount, $tokenConfig['decimals']);
+                } catch (InvalidArgumentException $e) {
+                    throw new TrongridWrapperException($e->getMessage());
+                }
+                $numberFormat = Formatter::toIntegerFormat($amount);
+
+                $contractAddress = $tokenConfig['contract'];
+                $contractAddressHex = $tronInstance->address2HexString($contractAddress);
+
+                $response = $this->httpClient->request('POST', $this->buildApiUrl('wallet/triggerconstantcontract', []), [
+                    'body' => json_encode([
+                        'contract_address' => $contractAddressHex,
+                        'function_selector' => 'transfer(address,uint256)',
+                        'parameter' => "{$toFormat}{$numberFormat}",
+                        'fee_limit' => 100000000,
+                        'call_value' => 0,
+                        'owner_address' => $fromAddress->getHexAddress(),
+                    ]),
+                    'headers' => [
+                        'accept' => 'application/json',
+                        'content-type' => 'application/json',
+                        'TRON-PRO-API-KEY' => $this->config->getApiKey(),
+                    ],
+                ]);
+
+                if ($statusCode = $response->getStatusCode() !== 200) {
+                    throw new TrongridWrapperException('The response has a code. ' . $statusCode .  ' Expected 200. ');
+                }
+
+                $content = json_decode($response->getBody()->getContents(), true);
+
+                if (isset($content['result']['code'])) {
+                    throw new TrongridWrapperException(hex2bin($content['result']['message']));
+                }
+
+                return $content['energy_used'];
+            }
+        } catch (TronException $e) {
+            throw new TrongridWrapperException($e->getMessage(), $e->getCode());
+        }
+
+        throw new TrongridWrapperException('Something went wrong');
+    }
+
+    /**
      * Create new transaction
      *
      * @param Address $fromAddress
@@ -209,6 +360,8 @@ class TrongridWrapper
                 } catch (TronException $e) {
                     throw new TrongridWrapperException($e->getMessage(), $e->getCode());
                 }
+
+//                var_dump($response); die;
 
                 if (isset($response['result']) && $response['result'] == true) {
                     return [
@@ -338,7 +491,7 @@ class TrongridWrapper
         if ($queryParams) {
             $urlParams = [];
             foreach ($queryParams as $key => $value) {
-                $urlParams[] = urlencode($key . '=' . $value);
+                $urlParams[] = urlencode($key) . '=' . urlencode($value);
             }
 
             $apiUrl .= '?' . implode('&', $urlParams);
